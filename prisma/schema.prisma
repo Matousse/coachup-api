@@ -1,0 +1,166 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Coach {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  name      String
+  phone     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Profile fields (Story 1.4)
+  description  String?
+  specialty    String?
+  city         String?
+  radius       Int?
+  instagramUrl String?
+  websiteUrl   String?
+
+  // Meta Ads fields (Story 4.1)
+  metaAdAccountId String?              // ID du compte pub Meta (act_xxx)
+  queuedForMeta   Boolean @default(false)  // En attente si limite atteinte
+
+  // Email preferences (Story 5.2)
+  emailWeeklyRecap  Boolean @default(true)   // Recevoir recap hebdomadaire
+  emailCampaignLive Boolean @default(true)   // Recevoir notif pub live
+
+  // Relations
+  photos       Photo[]
+  subscription Subscription?
+  videoJobs    VideoJob[]
+  alerts       Alert[]
+  campaign     Campaign?
+  tickets      SupportTicket[]
+}
+
+model Photo {
+  id        String   @id @default(uuid())
+  url       String
+  filename  String
+  coachId   String
+  coach     Coach    @relation(fields: [coachId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+}
+
+model Subscription {
+  id          String   @id @default(uuid())
+  coachId     String   @unique
+  coach       Coach    @relation(fields: [coachId], references: [id], onDelete: Cascade)
+  plan        String   // 'starter' | 'pro' | 'premium'
+  status      String   // 'pending' | 'active' | 'cancelled'
+  stripeSubId String?  // ID Stripe subscription (apres paiement)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model VideoJob {
+  id               String    @id @default(uuid())
+  coachId          String
+  coach            Coach     @relation(fields: [coachId], references: [id], onDelete: Cascade)
+  status           String    // 'pending' | 'processing' | 'completed' | 'failed' | 'retrying' | 'validated'
+  mode             String    @default("simple") // 'simple' | 'sophisticated'
+  template         String?   // 'dynamic' | 'local' | 'transform'
+  regeneration     Boolean   @default(false) // true si c'est une regeneration payante
+  paymentSessionId String?   // Stripe checkout session ID pour tracking
+  kieTaskId        String?   // Kie.ai task ID - IMPORTANT: used to resume polling on restart
+  videoUrl         String?   // URL de la video generee
+  error            String?   // Message d'erreur si echec
+  retryCount       Int       @default(0)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+}
+
+// Alert model for admin notifications (Story 4.1)
+model Alert {
+  id        String   @id @default(uuid())
+  type      String   // 'meta_account_limit' | 'meta_api_error' | 'payment_failed' | 'video_failed'
+  coachId   String?
+  coach     Coach?   @relation(fields: [coachId], references: [id], onDelete: SetNull)
+  message   String
+  resolved  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Campaign model for Meta Ads campaigns (Story 4.2)
+model Campaign {
+  id              String    @id @default(uuid())
+  coachId         String    @unique
+  coach           Coach     @relation(fields: [coachId], references: [id], onDelete: Cascade)
+
+  // Meta IDs
+  metaCampaignId  String?   // ID campagne Meta
+  metaAdSetId     String?   // ID ad set Meta
+  metaAdId        String?   // ID ad Meta
+  metaVideoId     String?   // ID video uploadee sur Meta
+
+  // Status
+  status          String    // 'draft' | 'pending_review' | 'active' | 'rejected' | 'paused'
+  rejectReason    String?   // Motif de rejet si applicable
+
+  // Configuration
+  dailyBudget     Float     // Budget quotidien en EUR
+
+  // Timestamps
+  submittedAt     DateTime? // Date soumission a Meta
+  launchedAt      DateTime? // Date lancement effectif (quand active)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relations (Story 5.1)
+  stats           CampaignStats?
+}
+
+// CampaignStats model for Meta Ads campaign statistics (Story 5.1)
+model CampaignStats {
+  id              String    @id @default(uuid())
+  campaignId      String    @unique
+  campaign        Campaign  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  // Meta metrics
+  impressions     Int       @default(0)  // Total impressions
+  clicks          Int       @default(0)  // Total clicks
+  reach           Int       @default(0)  // Unique reach
+  spend           Float     @default(0)  // Total spend in EUR
+
+  // Calculated metrics
+  ctr             Float?    // Click-through rate (%)
+  cpc             Float?    // Cost per click (EUR)
+
+  // Sync tracking
+  lastSyncedAt    DateTime?
+
+  // Timestamps
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+// SupportTicket model for coach support system (Story 5.4)
+model SupportTicket {
+  id        String          @id @default(uuid())
+  coachId   String
+  coach     Coach           @relation(fields: [coachId], references: [id], onDelete: Cascade)
+  subject   String
+  status    String          @default("open") // 'open' | 'in_progress' | 'resolved'
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+  messages  TicketMessage[]
+}
+
+// TicketMessage model for ticket conversation (Story 5.4)
+model TicketMessage {
+  id        String        @id @default(uuid())
+  ticketId  String
+  ticket    SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  content   String
+  isAdmin   Boolean       @default(false) // true if message from admin
+  createdAt DateTime      @default(now())
+}
