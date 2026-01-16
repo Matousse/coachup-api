@@ -1,0 +1,47 @@
+# Dependencies
+node_modules/
+
+# Build output (we rebuild in Docker)
+dist/
+
+# Environment files (mounted separately)
+.env
+.env.*
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Test files
+*.test.ts
+**/*.test.ts
+
+# Development/test scripts
+test-*.ts
+
+# Storage (mounted as volume)
+storage/
+uploads/
+
+# Documentation
+*.md
+docs/
+
+# Docker files (no need to copy into context)
+Dockerfile
+docker-compose*.yml
+.dockerignore

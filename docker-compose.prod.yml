@@ -1,0 +1,89 @@
+# ===============================
+# CoachUp API - Production Docker Compose
+# ===============================
+#
+# Usage on production server:
+#   docker compose -f docker-compose.prod.yml up -d --build
+#
+# Logs:
+#   docker compose -f docker-compose.prod.yml logs -f api
+#
+# Stop:
+#   docker compose -f docker-compose.prod.yml down
+#
+
+services:
+  # ===============================
+  # PostgreSQL Database
+  # ===============================
+  postgres:
+    image: postgres:16-alpine
+    container_name: coachup-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: coachup
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    # No ports exposed - only accessible from internal network
+
+  # ===============================
+  # CoachUp API
+  # ===============================
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: coachup-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # Database - internal Docker network
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/coachup?schema=public
+
+      # Server config
+      PORT: ${PORT:-3847}
+      NODE_ENV: production
+
+      # JWT
+      JWT_SECRET: ${JWT_SECRET}
+
+      # Frontend URL (for CORS)
+      FRONTEND_URL: ${FRONTEND_URL}
+
+      # Stripe
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET}
+      STRIPE_PRICE_STARTER: ${STRIPE_PRICE_STARTER}
+      STRIPE_PRICE_PRO: ${STRIPE_PRICE_PRO}
+      STRIPE_PRICE_PREMIUM: ${STRIPE_PRICE_PREMIUM}
+      STRIPE_PRICE_REGENERATION: ${STRIPE_PRICE_REGENERATION}
+
+      # Kie.ai
+      KIE_AI_API_KEY: ${KIE_AI_API_KEY}
+
+      # imgBB
+      IMGBB_API_KEY: ${IMGBB_API_KEY}
+
+      # Meta
+      META_STUB_MODE: ${META_STUB_MODE:-false}
+      META_BUSINESS_ID: ${META_BUSINESS_ID}
+      META_ACCESS_TOKEN: ${META_ACCESS_TOKEN}
+      META_ACCOUNT_LIMIT: ${META_ACCOUNT_LIMIT:-5}
+    ports:
+      - "${PORT:-3847}:${PORT:-3847}"
+    volumes:
+      # Persist storage data
+      - ./storage:/app/storage
+      - ./uploads:/app/uploads
+
+volumes:
+  postgres_data:

@@ -1,7 +1,24 @@
+# ===============================
+# CoachUp API - Local Development
+# ===============================
+#
+# This file is for LOCAL DEVELOPMENT only.
+# It runs PostgreSQL in Docker while you run the API locally.
+#
+# Usage:
+#   npm run db:start    # Start PostgreSQL
+#   npm run dev         # Start API locally
+#   npm run db:stop     # Stop PostgreSQL
+#
+# For PRODUCTION, use docker-compose.prod.yml:
+#   docker compose -f docker-compose.prod.yml up -d --build
+#
+
 services:
   postgres:
     image: postgres:16-alpine
     container_name: coachup-db
+    restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
